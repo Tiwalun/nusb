@@ -6,23 +6,24 @@ use std::{
 };
 
 use core_foundation::{base::TCFType, dictionary::CFDictionary, runloop::CFRunLoopSource};
+use io_kit_sys::serial::keys::kIOSerialBSDServiceValue;
 use io_kit_sys::{
+    IONotificationPort, IONotificationPortCreate, IONotificationPortDestroy,
+    IONotificationPortGetRunLoopSource, IOServiceAddMatchingNotification, IOServiceMatching,
     kIOMasterPortDefault,
     keys::{kIOFirstMatchNotification, kIOTerminatedNotification},
     ret::kIOReturnSuccess,
     types::io_iterator_t,
     usb::lib::kIOUSBDeviceClassName,
-    IONotificationPort, IONotificationPortCreate, IONotificationPortDestroy,
-    IONotificationPortGetRunLoopSource, IOServiceAddMatchingNotification, IOServiceMatching,
 };
 use log::debug;
 use slab::Slab;
 
-use crate::{hotplug::HotplugEvent, DeviceId, Error, ErrorKind};
+use crate::{DeviceId, Error, ErrorKind, hotplug::HotplugEvent};
 
 use super::{
     enumeration::{get_registry_id, probe_device},
-    events::{add_event_source, EventRegistration},
+    events::{EventRegistration, add_event_source},
     iokit::IoServiceIterator,
 };
 
@@ -52,6 +53,7 @@ pub(crate) struct MacHotplugWatch {
     waker_id: SlabWaker,
     terminated_iter: IoServiceIterator,
     matched_iter: IoServiceIterator,
+    cdc_matched_iter: IoServiceIterator,
     _registration: EventRegistration,
     _notification_port: NotificationPort,
 }
@@ -84,6 +86,14 @@ impl MacHotplugWatch {
             CFDictionary::wrap_under_create_rule(d)
         };
 
+        let cdc_dictionary = unsafe {
+            let d = IOServiceMatching(kIOSerialBSDServiceValue);
+            if d.is_null() {
+                return Err(Error::other("IOServiceMatching failed"));
+            }
+            CFDictionary::wrap_under_create_rule(d)
+        };
+
         let notification_port = NotificationPort::new();
         let terminated_iter = register_notification(
             &notification_port,
@@ -94,6 +104,12 @@ impl MacHotplugWatch {
         let matched_iter = register_notification(
             &notification_port,
             &dictionary,
+            &waker_id,
+            kIOFirstMatchNotification,
+        )?;
+        let cdc_matched_iter = register_notification(
+            &notification_port,
+            &cdc_dictionary,
             &waker_id,
             kIOFirstMatchNotification,
         )?;
@@ -109,6 +125,7 @@ impl MacHotplugWatch {
             waker_id,
             terminated_iter,
             matched_iter,
+            cdc_matched_iter,
             _registration: registration,
             _notification_port: notification_port,
         })
@@ -122,6 +139,14 @@ impl MacHotplugWatch {
                 return Poll::Ready(HotplugEvent::Connected(dev));
             } else {
                 debug!("failed to probe connected device");
+            }
+        }
+
+        while let Some(s) = self.cdc_matched_iter.next() {
+            if let Some(dev) = probe_device(s) {
+                return Poll::Ready(HotplugEvent::SerialConnected(dev));
+            } else {
+                debug!("failed to probe serial connected device");
             }
         }
 
