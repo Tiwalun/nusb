@@ -89,7 +89,7 @@ impl MacHotplugWatch {
         let cdc_dictionary = unsafe {
             let d = IOServiceMatching(kIOSerialBSDServiceValue);
             if d.is_null() {
-                return Err(Error::other("IOServiceMatching failed"));
+                return Err(Error::new(ErrorKind::Other, "IOServiceMatching failed"));
             }
             CFDictionary::wrap_under_create_rule(d)
         };
