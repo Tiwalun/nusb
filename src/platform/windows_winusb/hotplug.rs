@@ -11,10 +11,10 @@ use log::debug;
 use windows_sys::Win32::{
     Devices::{
         DeviceAndDriverInstallation::{
-            CM_NOTIFY_ACTION, CM_NOTIFY_ACTION_DEVICEINTERFACEARRIVAL,
-            CM_NOTIFY_ACTION_DEVICEINTERFACEREMOVAL, CM_NOTIFY_EVENT_DATA, CM_NOTIFY_FILTER,
-            CM_NOTIFY_FILTER_0, CM_NOTIFY_FILTER_0_0, CM_NOTIFY_FILTER_TYPE_DEVICEINTERFACE,
-            CM_Register_Notification, CM_Unregister_Notification, CR_SUCCESS, HCMNOTIFICATION,
+            CM_Register_Notification, CM_Unregister_Notification, CM_NOTIFY_ACTION,
+            CM_NOTIFY_ACTION_DEVICEINTERFACEARRIVAL, CM_NOTIFY_ACTION_DEVICEINTERFACEREMOVAL,
+            CM_NOTIFY_EVENT_DATA, CM_NOTIFY_FILTER, CM_NOTIFY_FILTER_0, CM_NOTIFY_FILTER_0_0,
+            CM_NOTIFY_FILTER_TYPE_DEVICEINTERFACE, CR_SUCCESS, HCMNOTIFICATION,
         },
         Properties::DEVPKEY_Device_InstanceId,
         Usb::GUID_DEVINTERFACE_USB_DEVICE,
@@ -24,9 +24,11 @@ use windows_sys::Win32::{
 };
 
 use crate::{
-    DeviceId, Error,
     hotplug::HotplugEvent,
-    platform::windows_winusb::{cfgmgr32::get_device_interface_property, util::WCString},
+    platform::windows_winusb::{
+        cfgmgr32::get_device_interface_property, enumeration::probe_serial_device, util::WCString,
+    },
+    DeviceId, Error,
 };
 
 use super::{enumeration::probe_device, util::WCStr};
@@ -145,7 +147,7 @@ impl WindowsHotplugWatch {
                 };
             }
             Some((Action::SerialConnect, devinst)) => {
-                if let Some(dev) = probe_device(devinst) {
+                if let Some(dev) = probe_serial_device(devinst) {
                     return Poll::Ready(HotplugEvent::SerialConnected(dev));
                 };
             }

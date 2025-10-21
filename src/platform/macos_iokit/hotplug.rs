@@ -8,22 +8,22 @@ use std::{
 use core_foundation::{base::TCFType, dictionary::CFDictionary, runloop::CFRunLoopSource};
 use io_kit_sys::serial::keys::kIOSerialBSDServiceValue;
 use io_kit_sys::{
-    IONotificationPort, IONotificationPortCreate, IONotificationPortDestroy,
-    IONotificationPortGetRunLoopSource, IOServiceAddMatchingNotification, IOServiceMatching,
     kIOMasterPortDefault,
     keys::{kIOFirstMatchNotification, kIOTerminatedNotification},
     ret::kIOReturnSuccess,
     types::io_iterator_t,
     usb::lib::kIOUSBDeviceClassName,
+    IONotificationPort, IONotificationPortCreate, IONotificationPortDestroy,
+    IONotificationPortGetRunLoopSource, IOServiceAddMatchingNotification, IOServiceMatching,
 };
 use log::debug;
 use slab::Slab;
 
-use crate::{DeviceId, Error, ErrorKind, hotplug::HotplugEvent};
+use crate::{hotplug::HotplugEvent, DeviceId, Error, ErrorKind};
 
 use super::{
     enumeration::{get_registry_id, probe_device},
-    events::{EventRegistration, add_event_source},
+    events::{add_event_source, EventRegistration},
     iokit::IoServiceIterator,
 };
 
